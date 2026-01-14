@@ -2,6 +2,7 @@
 #include "pyflame_rt/errors.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <iostream>
 #include <queue>
 #include <unordered_set>
@@ -239,7 +240,30 @@ PassResult PassManager::run(Graph& graph) {
 PassResult PassManager::run_until_fixed_point(Graph& graph) {
     PassResult total_result;
 
+    // MED-01 security fix: Enforce optimization timeout
+    auto start_time = std::chrono::steady_clock::now();
+    const int timeout_ms = config_.timeout_ms;
+
     for (int iter = 0; iter < config_.max_iterations; ++iter) {
+        // Check timeout before each iteration
+        if (timeout_ms > 0) {
+            auto now = std::chrono::steady_clock::now();
+            auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                now - start_time).count();
+            if (elapsed_ms > timeout_ms) {
+                if (config_.verbose) {
+                    std::cout << "[opt] Optimization timeout after " << elapsed_ms
+                              << "ms (limit: " << timeout_ms << "ms)" << std::endl;
+                }
+                total_result.timed_out = true;
+                total_result.warnings.push_back(
+                    "Optimization aborted: timeout exceeded (" +
+                    std::to_string(elapsed_ms) + "ms > " +
+                    std::to_string(timeout_ms) + "ms)");
+                break;
+            }
+        }
+
         if (config_.verbose) {
             std::cout << "[opt] Fixed-point iteration " << (iter + 1) << std::endl;
         }

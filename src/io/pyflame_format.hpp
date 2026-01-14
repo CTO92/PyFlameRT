@@ -15,7 +15,8 @@ struct DeserializationLimits {
     static constexpr uint64_t MAX_DIMS = 16;                                 // Max tensor dimensions
     static constexpr uint64_t MAX_NODES = 1000000;                           // Max graph nodes
     static constexpr uint64_t MAX_ATTRIBUTES = 1000;                         // Max attributes per node
-    static constexpr int64_t MAX_DIMENSION_SIZE = 1000000000LL;              // 1 billion per dimension (CRIT-02 fix)
+    static constexpr int64_t MAX_DIMENSION_SIZE = 100000000LL;               // 100 million per dimension (CRIT-02 fix)
+    static constexpr int64_t MAX_TOTAL_ELEMENTS = 1000000000LL;              // 1 billion total elements (CRIT-02 fix)
 };
 
 /// Native PyFlame model format (.pfm) handler

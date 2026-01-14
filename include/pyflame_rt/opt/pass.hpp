@@ -35,6 +35,9 @@ struct PassResult {
     /// Whether the pass modified the graph
     bool modified = false;
 
+    /// Whether optimization was aborted due to timeout (MED-01 security fix)
+    bool timed_out = false;
+
     /// Statistics about changes
     PassStats stats;
 
@@ -43,6 +46,7 @@ struct PassResult {
 
     PassResult& operator+=(const PassResult& other) {
         modified = modified || other.modified;
+        timed_out = timed_out || other.timed_out;
         stats += other.stats;
         warnings.insert(warnings.end(),
                        other.warnings.begin(),
@@ -84,6 +88,9 @@ struct PassManagerConfig {
 
     /// Maximum iterations for fixed-point optimization
     int max_iterations = 10;
+
+    /// Timeout in milliseconds (0 = no timeout) - MED-01 security fix
+    int timeout_ms = 30000;  // Default 30 seconds
 
     /// Enable verbose logging
     bool verbose = false;

@@ -8,30 +8,18 @@
 namespace pyflame_rt {
 
 // ============================================================================
-// Path Sanitization for Error Messages (LOW-01 fix)
+// Path Sanitization for Error Messages (HIGH-01 security fix)
 // ============================================================================
 
-/// Global flag to control path sanitization in error messages.
-/// When true (default for release builds), full paths are stripped to basename only.
-/// When false, full paths are included (useful for debugging).
-#ifndef PYFLAME_RT_SANITIZE_ERROR_PATHS
-#ifdef NDEBUG
-#define PYFLAME_RT_SANITIZE_ERROR_PATHS 1
-#else
-#define PYFLAME_RT_SANITIZE_ERROR_PATHS 0
-#endif
-#endif
-
-/// Extract filename from a path for safer error messages (LOW-01 fix)
-/// This prevents leaking directory structure information in production.
+/// Extract filename from a path for safer error messages.
+/// SECURITY: Always strips directory information to prevent path disclosure.
+/// This is intentionally not configurable - full paths should never leak.
 inline std::string sanitize_path_for_error(const std::string& path) {
-#if PYFLAME_RT_SANITIZE_ERROR_PATHS
     // Find the last path separator (handle both Unix and Windows)
     size_t last_sep = path.find_last_of("/\\");
     if (last_sep != std::string::npos) {
         return path.substr(last_sep + 1);
     }
-#endif
     return path;
 }
 

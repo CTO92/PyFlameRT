@@ -212,7 +212,23 @@ std::pair<std::string, Tensor> read_tensor(std::istream& is) {
         }
     }
 
-    // Create tensor (this will use checked_product internally after CRIT-05 fix)
+    // CRIT-02 fix: Validate total element count before allocation
+    // Use checked_product to detect overflow, then verify against limit
+    int64_t total_elements;
+    try {
+        total_elements = checked_product(shape);
+    } catch (const std::overflow_error&) {
+        throw InvalidModelError(
+            "Tensor '" + name + "' dimension product overflows int64");
+    }
+    if (total_elements > DeserializationLimits::MAX_TOTAL_ELEMENTS) {
+        throw InvalidModelError(
+            "Tensor '" + name + "' has too many elements: " +
+            std::to_string(total_elements) + " > " +
+            std::to_string(DeserializationLimits::MAX_TOTAL_ELEMENTS));
+    }
+
+    // Create tensor (safe now that we've validated the size)
     Tensor tensor(shape, dtype);
 
     // Read tensor data with size limit

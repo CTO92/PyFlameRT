@@ -199,16 +199,13 @@ std::vector<std::string> InferenceSession::get_providers() const {
 }
 
 void InferenceSession::optimize_graph() {
-    // Security fix MED-03: Start timer for optimization timeout
-    auto start_time = std::chrono::steady_clock::now();
-    const int timeout_ms = options_.optimization_timeout_ms;
-
-    // Create pass manager with configuration
+    // Create pass manager with configuration (MED-01: timeout is enforced by PassManager)
     opt::PassManagerConfig pm_config;
     pm_config.opt_level = options_.optimization_level;
     pm_config.verbose = options_.verbose_optimization;
     pm_config.validate_after_pass = true;
     pm_config.max_iterations = 100;  // Security: limit iterations to prevent infinite loops
+    pm_config.timeout_ms = options_.optimization_timeout_ms;  // MED-01: enforce timeout
 
     // Create pass manager and register built-in passes
     opt::PassManager pm(pm_config);
@@ -218,24 +215,22 @@ void InferenceSession::optimize_graph() {
     pm.register_pass(std::make_unique<opt::OperatorFusionPass>());
     pm.register_pass(std::make_unique<opt::LayoutOptimizationPass>());
 
-    // Run optimization until fixed point
+    // Run optimization until fixed point (MED-01: will abort on timeout)
     auto result = pm.run_until_fixed_point(*graph_);
 
-    // Security fix MED-03: Check if optimization exceeded timeout
-    auto end_time = std::chrono::steady_clock::now();
-    auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
-    if (elapsed_ms > timeout_ms) {
-        std::cerr << "Warning: Optimization took " << elapsed_ms << "ms, "
-                  << "exceeding timeout of " << timeout_ms << "ms. "
-                  << "Consider using lower optimization level.\n";
+    // MED-01: Check if optimization was aborted due to timeout
+    if (result.timed_out) {
+        std::cerr << "Warning: Optimization was aborted due to timeout. "
+                  << "Consider using lower optimization level or increasing timeout.\n";
     }
 
     if (options_.verbose_optimization) {
-        std::cerr << "Optimization completed in " << elapsed_ms << "ms:"
+        std::cerr << "Optimization completed:"
                   << " nodes_removed=" << result.stats.nodes_removed
                   << " nodes_added=" << result.stats.nodes_added
                   << " nodes_fused=" << result.stats.nodes_fused
                   << " constants_folded=" << result.stats.constants_folded
+                  << (result.timed_out ? " (TIMED OUT)" : "")
                   << "\n";
 
         for (const auto& warning : result.warnings) {

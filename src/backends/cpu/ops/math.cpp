@@ -437,15 +437,28 @@ std::vector<Tensor> cpu_gemm(const std::vector<const Tensor*>& inputs,
     return {std::move(result)};
 }
 
+/// Sqrt operator with optional strict mode check (HIGH-03 fix)
 std::vector<Tensor> cpu_sqrt(const std::vector<const Tensor*>& inputs,
-                             const OpContext& /*ctx*/) {
-    validate_input_count(inputs, 1, "Sqrt");  // LOW-01 fix
+                             const OpContext& ctx) {
+    validate_input_count(inputs, 1, "Sqrt");
     const Tensor& x = *inputs[0];
-    Tensor result(x.shape(), x.dtype());
 
     const float* in = x.data_ptr<float>();
-    float* out = result.data_ptr<float>();
     int64_t n = x.num_elements();
+
+    // HIGH-03 fix: In strict math mode, check for negative inputs
+    if (ctx.strict_math_mode) {
+        for (int64_t i = 0; i < n; ++i) {
+            if (in[i] < 0.0f) {
+                throw std::domain_error(
+                    "Sqrt: negative input at index " + std::to_string(i) +
+                    " (strict_math_mode enabled)");
+            }
+        }
+    }
+
+    Tensor result(x.shape(), x.dtype());
+    float* out = result.data_ptr<float>();
 
     for (int64_t i = 0; i < n; ++i) {
         out[i] = std::sqrt(in[i]);
@@ -471,15 +484,28 @@ std::vector<Tensor> cpu_exp(const std::vector<const Tensor*>& inputs,
     return {std::move(result)};
 }
 
+/// Log operator with optional strict mode check (HIGH-03 fix)
 std::vector<Tensor> cpu_log(const std::vector<const Tensor*>& inputs,
-                            const OpContext& /*ctx*/) {
-    validate_input_count(inputs, 1, "Log");  // LOW-01 fix
+                            const OpContext& ctx) {
+    validate_input_count(inputs, 1, "Log");
     const Tensor& x = *inputs[0];
-    Tensor result(x.shape(), x.dtype());
 
     const float* in = x.data_ptr<float>();
-    float* out = result.data_ptr<float>();
     int64_t n = x.num_elements();
+
+    // HIGH-03 fix: In strict math mode, check for non-positive inputs
+    if (ctx.strict_math_mode) {
+        for (int64_t i = 0; i < n; ++i) {
+            if (in[i] <= 0.0f) {
+                throw std::domain_error(
+                    "Log: non-positive input at index " + std::to_string(i) +
+                    " (value: " + std::to_string(in[i]) + ", strict_math_mode enabled)");
+            }
+        }
+    }
+
+    Tensor result(x.shape(), x.dtype());
+    float* out = result.data_ptr<float>();
 
     for (int64_t i = 0; i < n; ++i) {
         out[i] = std::log(in[i]);

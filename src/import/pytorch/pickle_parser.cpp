@@ -1,4 +1,5 @@
 #include "pickle_parser.hpp"
+#include "pyflame_rt/types.hpp"
 
 #include <cstring>
 #include <fstream>
@@ -227,35 +228,41 @@ std::unordered_map<std::string, std::vector<uint8_t>> PickleParser::extract_zip(
         uint16_t extra_len;
         std::memcpy(&extra_len, bytes + pos + 28, 2);
 
-        // Security: check for overflow in header size calculation (HIGH-02 fix)
+        // HIGH-02 fix: Use checked_add for all offset calculations to prevent overflow
+        // Step 1: Calculate header_end = pos + 30 + name_len
         size_t header_end;
-        if (pos > SIZE_MAX - 30 ||
-            pos + 30 > SIZE_MAX - name_len) {
+        try {
+            header_end = checked_add(checked_add(pos, 30), static_cast<size_t>(name_len));
+        } catch (const std::overflow_error&) {
             throw ModelParseError("Invalid ZIP: header offset overflow", "PyTorch");
         }
-        header_end = pos + 30 + name_len;
 
-        // Read filename
+        // Step 2: Validate header_end is within bounds
         if (header_end > size) {
             throw ModelParseError("Invalid ZIP: filename extends past end", "PyTorch");
         }
         std::string filename(reinterpret_cast<const char*>(bytes + pos + 30), name_len);
 
-        // Security: check for overflow in data_start calculation (HIGH-02 fix)
+        // Step 3: Calculate data_start = header_end + extra_len
         size_t data_start;
-        if (header_end > SIZE_MAX - extra_len) {
+        try {
+            data_start = checked_add(header_end, static_cast<size_t>(extra_len));
+        } catch (const std::overflow_error&) {
             throw ModelParseError("Invalid ZIP: data offset overflow", "PyTorch");
         }
-        data_start = header_end + extra_len;
 
         size_t data_len = (compression == 0) ? uncompressed_size : compressed_size;
 
-        // Security: check for overflow in data range calculation (HIGH-02 fix)
-        if (data_start > SIZE_MAX - data_len) {
+        // Step 4: Calculate data_end = data_start + data_len
+        size_t data_end;
+        try {
+            data_end = checked_add(data_start, data_len);
+        } catch (const std::overflow_error&) {
             throw ModelParseError("Invalid ZIP: data size overflow", "PyTorch");
         }
 
-        if (data_start + data_len > size) {
+        // Step 5: Validate data range is within bounds
+        if (data_end > size) {
             throw ModelParseError("Invalid ZIP: file data extends past end", "PyTorch");
         }
 

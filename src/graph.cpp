@@ -77,7 +77,7 @@ void Graph::add_initializer(const std::string& name, Tensor tensor) {
     initializers_[name] = std::move(tensor);
 }
 
-// Security fix HIGH-01: Safe optional reference accessors
+// Security: Safe optional reference accessors (CRIT-01 fix - removed unsafe pointer API)
 std::optional<std::reference_wrapper<Tensor>> Graph::get_initializer(const std::string& name) {
     auto it = initializers_.find(name);
     if (it != initializers_.end()) {
@@ -92,17 +92,6 @@ std::optional<std::reference_wrapper<const Tensor>> Graph::get_initializer(const
         return std::cref(it->second);
     }
     return std::nullopt;
-}
-
-// Deprecated legacy raw pointer accessors
-Tensor* Graph::get_initializer_unsafe(const std::string& name) {
-    auto it = initializers_.find(name);
-    return it != initializers_.end() ? &it->second : nullptr;
-}
-
-const Tensor* Graph::get_initializer_unsafe(const std::string& name) const {
-    auto it = initializers_.find(name);
-    return it != initializers_.end() ? &it->second : nullptr;
 }
 
 const std::string* Graph::get_producer(const std::string& tensor_name) const {

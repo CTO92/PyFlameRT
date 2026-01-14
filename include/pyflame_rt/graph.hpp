@@ -13,10 +13,20 @@
 namespace pyflame_rt {
 
 /// Graph size limits for security (prevents resource exhaustion)
+/// MED-02 fix: Reduced default limits to prevent DoS attacks
 struct GraphLimits {
-    size_t max_nodes = 10000000;        // 10 million nodes max
-    size_t max_initializers = 1000000;  // 1 million initializers max
-    size_t max_initializer_bytes = 16ULL * 1024 * 1024 * 1024;  // 16 GB max total
+    size_t max_nodes = 100000;          // 100k nodes max (was 10M)
+    size_t max_initializers = 50000;    // 50k initializers max (was 1M)
+    size_t max_initializer_bytes = 4ULL * 1024 * 1024 * 1024;  // 4 GB max (was 16 GB)
+
+    /// Create limits for large models (use with caution)
+    static GraphLimits large_model() {
+        return {
+            .max_nodes = 1000000,          // 1M nodes
+            .max_initializers = 500000,    // 500k initializers
+            .max_initializer_bytes = 16ULL * 1024 * 1024 * 1024  // 16 GB
+        };
+    }
 };
 
 /// Represents a computational graph of operations
@@ -44,17 +54,10 @@ public:
     void add_initializer(const std::string& name, Tensor tensor);
 
     /// Get initializer by name (returns nullopt if not found)
-    /// Security fix HIGH-01: Returns optional reference instead of raw pointer
+    /// Security: Returns optional reference instead of raw pointer
     /// to prevent dangling pointer issues after map modifications
     std::optional<std::reference_wrapper<Tensor>> get_initializer(const std::string& name);
     std::optional<std::reference_wrapper<const Tensor>> get_initializer(const std::string& name) const;
-
-    /// Legacy raw pointer API (deprecated - use optional version)
-    /// WARNING: Pointer may be invalidated if initializers are added/removed
-    [[deprecated("Use get_initializer() returning optional<reference_wrapper> instead")]]
-    Tensor* get_initializer_unsafe(const std::string& name);
-    [[deprecated("Use get_initializer() returning optional<reference_wrapper> instead")]]
-    const Tensor* get_initializer_unsafe(const std::string& name) const;
 
     const std::unordered_map<std::string, Tensor>& initializers() const {
         return initializers_;

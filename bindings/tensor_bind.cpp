@@ -3,6 +3,7 @@
 #include <pybind11/stl.h>
 #include "pyflame_rt/tensor.hpp"
 #include "pyflame_rt/types.hpp"
+#include <limits>
 #include <stdexcept>
 
 namespace py = pybind11;
@@ -44,7 +45,7 @@ std::string dtype_to_numpy_str(DType dt) {
 
 } // anonymous namespace
 
-/// Create Tensor from numpy array with validation (MED-01 fix)
+/// Create Tensor from numpy array with validation (MED-01, MED-03 fixes)
 Tensor tensor_from_numpy(py::array arr) {
     // Security: ensure array is contiguous and check for failure (MED-01)
     py::array contiguous = py::array::ensure(arr, py::array::c_style);
@@ -71,9 +72,45 @@ Tensor tensor_from_numpy(py::array arr) {
     }
 
     DType dtype = numpy_to_dtype(contiguous.dtype());
+    size_t elem_size = dtype_size(dtype);
+
+    // MED-03 fix: Validate element count independently to detect numpy overflow
+    // If numpy's nbytes overflowed, our checked_product will catch it
+    int64_t expected_elements;
+    try {
+        expected_elements = checked_product(shape);
+    } catch (const std::overflow_error&) {
+        throw std::runtime_error(
+            "Array shape product overflows - array too large");
+    }
+
+    // MED-03 fix: Validate that expected bytes don't overflow
+    if (expected_elements > 0 &&
+        static_cast<size_t>(expected_elements) > std::numeric_limits<size_t>::max() / elem_size) {
+        throw std::runtime_error(
+            "Array size in bytes would overflow - array too large");
+    }
+    size_t expected_bytes = static_cast<size_t>(expected_elements) * elem_size;
+
+    // Get numpy's reported size
+    py::ssize_t numpy_nbytes_signed = contiguous.nbytes();
+
+    // MED-03 fix: Check for numpy overflow (would report negative or very small)
+    if (numpy_nbytes_signed < 0) {
+        throw std::runtime_error(
+            "Numpy array nbytes overflow detected (negative value)");
+    }
+    size_t numpy_bytes = static_cast<size_t>(numpy_nbytes_signed);
+
+    // MED-03 fix: Verify numpy's nbytes matches our calculation
+    if (numpy_bytes != expected_bytes) {
+        throw std::runtime_error(
+            "Numpy nbytes (" + std::to_string(numpy_bytes) +
+            ") doesn't match expected size (" + std::to_string(expected_bytes) +
+            ") - possible overflow");
+    }
 
     // Security fix MED-06: Enforce maximum tensor size to prevent resource exhaustion
-    size_t numpy_bytes = static_cast<size_t>(contiguous.nbytes());
     if (numpy_bytes > MAX_TENSOR_BYTES) {
         throw std::runtime_error(
             "Tensor size " + std::to_string(numpy_bytes / (1024 * 1024)) +
