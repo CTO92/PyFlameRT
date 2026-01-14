@@ -1,0 +1,95 @@
+# ServiceMonitor for Prometheus Operator
+# Requires prometheus-operator to be installed in your cluster
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: pyflame-rt-monitor
+  namespace: pyflame-rt
+  labels:
+    app.kubernetes.io/name: pyflame-rt
+    app.kubernetes.io/component: monitoring
+    # Label for prometheus-operator service discovery
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: pyflame-rt
+      app.kubernetes.io/component: metrics
+  namespaceSelector:
+    matchNames:
+      - pyflame-rt
+  endpoints:
+    - port: metrics
+      interval: 15s
+      path: /metrics
+      scheme: http
+      scrapeTimeout: 10s
+---
+# PrometheusRule for alerting
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: pyflame-rt-alerts
+  namespace: pyflame-rt
+  labels:
+    app.kubernetes.io/name: pyflame-rt
+    app.kubernetes.io/component: monitoring
+    release: prometheus
+spec:
+  groups:
+    - name: pyflame-rt.rules
+      rules:
+        # Alert on high error rate
+        - alert: PyFlameRTHighErrorRate
+          expr: |
+            sum(rate(pyflame_request_total{status="error"}[5m])) /
+            sum(rate(pyflame_request_total[5m])) > 0.05
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High error rate in PyFlameRT"
+            description: "Error rate is above 5% for the last 5 minutes"
+
+        # Alert on high latency
+        - alert: PyFlameRTHighLatency
+          expr: |
+            histogram_quantile(0.95, sum(rate(pyflame_request_latency_seconds_bucket[5m])) by (le, model))
+            > 1.0
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High inference latency in PyFlameRT"
+            description: "P95 latency is above 1 second for model {{ $labels.model }}"
+
+        # Alert on no models loaded
+        - alert: PyFlameRTNoModelsLoaded
+          expr: pyflame_model_loaded == 0
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "No models loaded in PyFlameRT"
+            description: "The server has no models loaded for the last 2 minutes"
+
+        # Alert on high queue size
+        - alert: PyFlameRTHighQueueSize
+          expr: pyflame_queue_size > 100
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High queue size in PyFlameRT"
+            description: "Queue size for model {{ $labels.model }} is above 100"
+
+        # Alert on pod not ready
+        - alert: PyFlameRTPodNotReady
+          expr: |
+            kube_pod_status_ready{namespace="pyflame-rt", condition="true"} == 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "PyFlameRT pod not ready"
+            description: "Pod {{ $labels.pod }} is not ready for 5 minutes"

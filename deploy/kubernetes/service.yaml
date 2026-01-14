@@ -1,0 +1,65 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: pyflame-rt
+  namespace: pyflame-rt
+  labels:
+    app.kubernetes.io/name: pyflame-rt
+    app.kubernetes.io/component: server
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+      protocol: TCP
+    - name: grpc
+      port: 9090
+      targetPort: grpc
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: pyflame-rt
+    app.kubernetes.io/component: server
+---
+# Headless service for StatefulSet or direct pod communication
+apiVersion: v1
+kind: Service
+metadata:
+  name: pyflame-rt-headless
+  namespace: pyflame-rt
+  labels:
+    app.kubernetes.io/name: pyflame-rt
+    app.kubernetes.io/component: server
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+    - name: grpc
+      port: 9090
+      targetPort: grpc
+  selector:
+    app.kubernetes.io/name: pyflame-rt
+    app.kubernetes.io/component: server
+---
+# Metrics service for Prometheus scraping
+apiVersion: v1
+kind: Service
+metadata:
+  name: pyflame-rt-metrics
+  namespace: pyflame-rt
+  labels:
+    app.kubernetes.io/name: pyflame-rt
+    app.kubernetes.io/component: metrics
+spec:
+  type: ClusterIP
+  ports:
+    - name: metrics
+      port: 9091
+      targetPort: metrics
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: pyflame-rt
+    app.kubernetes.io/component: server

@@ -1,0 +1,66 @@
+[build-system]
+requires = ["scikit-build-core>=0.4.0", "pybind11>=2.10.0"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "pyflame-rt"
+version = "0.1.0"
+description = "High-performance inference runtime for Cerebras WSE"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+authors = [
+    {name = "PyFlameRT Team"}
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: C++",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+keywords = ["inference", "runtime", "cerebras", "deep-learning", "neural-network"]
+dependencies = [
+    "numpy>=1.21.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/pyflame/pyflame-rt"
+Documentation = "https://github.com/pyflame/pyflame-rt#readme"
+Repository = "https://github.com/pyflame/pyflame-rt.git"
+Issues = "https://github.com/pyflame/pyflame-rt/issues"
+
+[tool.scikit-build]
+cmake.minimum-version = "3.18"
+cmake.build-type = "Release"
+wheel.packages = ["python/pyflame_rt"]
+
+[tool.scikit-build.cmake.define]
+PYFLAME_RT_BUILD_TESTS = "OFF"
+PYFLAME_RT_BUILD_PYTHON = "ON"
+
+[tool.pytest.ini_options]
+testpaths = ["tests/python"]
+python_files = ["test_*.py"]
+addopts = "-v --tb=short"
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N"]
+ignore = ["E501"]

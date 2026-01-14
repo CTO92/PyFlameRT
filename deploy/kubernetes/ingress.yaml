@@ -1,0 +1,63 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: pyflame-rt-ingress
+  namespace: pyflame-rt
+  labels:
+    app.kubernetes.io/name: pyflame-rt
+    app.kubernetes.io/component: ingress
+  annotations:
+    # Nginx ingress controller annotations
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "10"
+    # Enable request buffering for large inference requests
+    nginx.ingress.kubernetes.io/proxy-buffering: "on"
+    # Rate limiting (adjust as needed)
+    nginx.ingress.kubernetes.io/limit-rps: "100"
+    nginx.ingress.kubernetes.io/limit-connections: "50"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: inference.example.com  # Change to your domain
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: pyflame-rt
+                port:
+                  name: http
+  # TLS configuration (uncomment and configure for HTTPS)
+  # tls:
+  #   - hosts:
+  #       - inference.example.com
+  #     secretName: pyflame-rt-tls
+---
+# Optional: Ingress for gRPC (requires gRPC-capable ingress controller)
+# apiVersion: networking.k8s.io/v1
+# kind: Ingress
+# metadata:
+#   name: pyflame-rt-grpc-ingress
+#   namespace: pyflame-rt
+#   annotations:
+#     nginx.ingress.kubernetes.io/backend-protocol: "GRPC"
+# spec:
+#   ingressClassName: nginx
+#   rules:
+#     - host: grpc.inference.example.com
+#       http:
+#         paths:
+#           - path: /
+#             pathType: Prefix
+#             backend:
+#               service:
+#                 name: pyflame-rt
+#                 port:
+#                   name: grpc
+#   tls:
+#     - hosts:
+#         - grpc.inference.example.com
+#       secretName: pyflame-rt-grpc-tls
